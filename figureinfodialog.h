@@ -5,6 +5,7 @@
 #include <QList>
 #include <QMap>
 #include <QVariant>
+#include <QTableWidgetItem>
 
 namespace Ui {
 class FigureInfoDialog;
@@ -20,8 +21,15 @@ public:
 
     void updateTable(const QList<QMap<QString, QVariant>>& figures); // Function to update the table
 
+signals:
+    void figureSelected(const QMap<QString, QVariant>& figure);
+
+private slots:
+    void on_tableWidget_itemClicked(QTableWidgetItem *item);
+
 private:
     Ui::FigureInfoDialog *ui;
+    QList<QMap<QString, QVariant>> figures;
 };
 
 #endif // FIGUREINFODIALOG_H
