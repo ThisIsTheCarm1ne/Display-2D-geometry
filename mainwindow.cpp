@@ -4,6 +4,8 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsPolygonItem>
 #include <QPolygonF>
+#include <QFile>
+#include <QTextStream>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -20,6 +22,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->showFigureInfoButton, &QPushButton::clicked, this, &MainWindow::on_showFigureInfoButton_clicked);
     connect(figureInfoDialog, &FigureInfoDialog::figureSelected, this, &MainWindow::on_drawSelectedFigure);
     connect(ui->drawAllFiguresButton, &QPushButton::clicked, this, &MainWindow::on_drawAllFiguresButton_clicked);
+    connect(ui->saveFiguresButton, &QPushButton::clicked, this, &MainWindow::on_saveFiguresButton_clicked);
+    connect(ui->loadFiguresButton, &QPushButton::clicked, this, &MainWindow::on_loadFiguresButton_clicked);
 }
 
 MainWindow::~MainWindow()
@@ -98,5 +102,67 @@ void MainWindow::drawFigure(const QMap<QString, QVariant>& figure)
     if (item) {
         item->setTransformOriginPoint(size / 2, size / 2);
         item->setRotation(rotation);
+    }
+}
+
+void MainWindow::on_saveFiguresButton_clicked()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save Figures"), "", tr("CSV Files (*.csv)"));
+    if (!fileName.isEmpty()) {
+        saveFiguresToFile(fileName);
+    }
+}
+
+void MainWindow::on_loadFiguresButton_clicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Load Figures"), "", tr("CSV Files (*.csv)"));
+    if (!fileName.isEmpty()) {
+        loadFiguresFromFile(fileName);
+    }
+}
+
+void MainWindow::saveFiguresToFile(const QString &fileName)
+{
+    QString finalFileName = fileName;
+    if (!finalFileName.endsWith(".csv", Qt::CaseInsensitive)) {
+        finalFileName += ".csv";
+    }
+
+    QFile file(finalFileName);
+    if (file.open(QIODevice::WriteOnly)) {
+        QTextStream out(&file);
+        for (const auto &figure : figures) {
+            out << figure["shape"].toString() << ","
+                << figure["size"].toInt() << ","
+                << figure["rotation"].toInt() << "\n";
+        }
+        file.close();
+    } else {
+        qDebug() << "Could not open file for writing";
+    }
+}
+
+void MainWindow::loadFiguresFromFile(const QString &fileName)
+{
+    QFile file(fileName);
+    if (file.open(QIODevice::ReadOnly)) {
+        QTextStream in(&file);
+        figures.clear();
+        scene->clear();
+        while (!in.atEnd()) {
+            QString line = in.readLine();
+            QStringList parts = line.split(",");
+            if (parts.size() == 3) {
+                QMap<QString, QVariant> figure;
+                figure["shape"] = parts[0];
+                figure["size"] = parts[1].toInt();
+                figure["rotation"] = parts[2].toInt();
+                figures.append(figure);
+                drawFigure(figure);
+            }
+        }
+        file.close();
+    } else {
+        qDebug() << "Could not open file for reading";
     }
 }
