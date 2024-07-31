@@ -1,11 +1,11 @@
 #include "mainwindow.h"
-#include "./ui_mainwindow.h"
-#include <QGraphicsEllipseItem>
-#include <QGraphicsRectItem>
-#include <QGraphicsPolygonItem>
-#include <QPolygonF>
 #include <QFile>
+#include <QGraphicsEllipseItem>
+#include <QGraphicsPolygonItem>
+#include <QGraphicsRectItem>
+#include <QPolygonF>
 #include <QTextStream>
+#include "./ui_mainwindow.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,11 +19,40 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect the button click signal to the slot
     connect(ui->addAShape, &QPushButton::clicked, this, &MainWindow::on_addFigureButton_clicked);
     connect(ui->clearCanvas, &QPushButton::clicked, this, &MainWindow::on_clearCanvasButton_clicked);
-    connect(ui->showFigureInfoButton, &QPushButton::clicked, this, &MainWindow::on_showFigureInfoButton_clicked);
-    connect(figureInfoDialog, &FigureInfoDialog::figureSelected, this, &MainWindow::on_drawSelectedFigure);
-    connect(ui->drawAllFiguresButton, &QPushButton::clicked, this, &MainWindow::on_drawAllFiguresButton_clicked);
-    connect(ui->saveFiguresButton, &QPushButton::clicked, this, &MainWindow::on_saveFiguresButton_clicked);
-    connect(ui->loadFiguresButton, &QPushButton::clicked, this, &MainWindow::on_loadFiguresButton_clicked);
+    connect(ui->showFigureInfoButton,
+            &QPushButton::clicked,
+            this,
+            &MainWindow::on_showFigureInfoButton_clicked);
+    connect(figureInfoDialog,
+            &FigureInfoDialog::figureSelected,
+            this,
+            &MainWindow::on_drawSelectedFigure);
+    connect(ui->drawAllFiguresButton,
+            &QPushButton::clicked,
+            this,
+            &MainWindow::on_drawAllFiguresButton_clicked);
+    connect(ui->saveFiguresButton,
+            &QPushButton::clicked,
+            this,
+            &MainWindow::on_saveFiguresButton_clicked);
+    connect(ui->loadFiguresButton,
+            &QPushButton::clicked,
+            this,
+            &MainWindow::on_loadFiguresButton_clicked);
+
+    // changin min/max values on spinboxes that are related to picking location
+    ui->locationX->setMinimum(-255);
+    ui->locationX->setMaximum(255);
+
+    ui->locationY->setMinimum(-255);
+    ui->locationY->setMaximum(255);
+
+    //  The rest spinboxes
+    ui->size->setMinimum(-255);
+    ui->size->setMaximum(255);
+
+    ui->rotation->setMinimum(-360);
+    ui->rotation->setMaximum(360);
 }
 
 MainWindow::~MainWindow()
@@ -40,11 +69,15 @@ void MainWindow::on_addFigureButton_clicked()
     QString selectedShape = currentItem->text();
     int size = ui->size->value();
     int rotation = ui->rotation->value();
+    int locationX = ui->locationX->value();
+    int locationY = ui->locationY->value();
 
     QMap<QString, QVariant> figure;
     figure["shape"] = selectedShape;
     figure["size"] = size;
     figure["rotation"] = rotation;
+    figure["locationX"] = locationX;
+    figure["locationY"] = locationY;
 
     drawFigure(figure);
     figures.append(figure);
@@ -52,62 +85,67 @@ void MainWindow::on_addFigureButton_clicked()
 
 void MainWindow::on_clearCanvasButton_clicked()
 {
-    scene->clear();  // Clear all items from the scene
+    scene->clear(); // Clear all items from the scene
 }
 
 void MainWindow::on_showFigureInfoButton_clicked()
 {
     figureInfoDialog->updateTable(figures); // Update the table with stored figure information
-    figureInfoDialog->exec(); // Show the dialog modally
+    figureInfoDialog->exec();               // Show the dialog modally
 }
 
-void MainWindow::on_drawSelectedFigure(const QMap<QString, QVariant>& figure)
+void MainWindow::on_drawSelectedFigure(const QMap<QString, QVariant> &figure)
 {
     drawFigure(figure);
 }
 
 void MainWindow::on_drawAllFiguresButton_clicked()
 {
-    for (const auto& figure : figures) {
+    for (const auto &figure : figures) {
         drawFigure(figure);
     }
 }
 
-void MainWindow::drawFigure(const QMap<QString, QVariant>& figure)
+void MainWindow::drawFigure(const QMap<QString, QVariant> &figure)
 {
     QString selectedShape = figure["shape"].toString();
     int size = figure["size"].toInt();
     int rotation = figure["rotation"].toInt();
+    int locationX = figure["locationX"].toInt();
+    int locationY = figure["locationY"].toInt();
 
     QGraphicsItem *item = nullptr;
 
     if (selectedShape == "Circle") {
-        item = scene->addEllipse(0, 0, size, size);
+        item = scene->addEllipse(locationX, locationY, size, size);
     } else if (selectedShape == "Square") {
-        item = scene->addRect(0, 0, size, size);
+        item = scene->addRect(locationX, locationY, size, size);
     } else if (selectedShape == "Triangle") {
         QPolygonF triangle;
-        triangle << QPointF(0, 0) << QPointF(size, 0) << QPointF(0, size);
+        triangle << QPointF(locationX, locationY) << QPointF(locationX + size, locationY) << QPointF(locationX, locationY + size);
         item = scene->addPolygon(triangle);
     } else if (selectedShape == "N-gon") {
         int n = 5;
         QPolygonF polygon;
         for (int i = 0; i < n; ++i) {
             double angle = (i * 2 * M_PI) / n;
-            polygon << QPointF(size * cos(angle), size * sin(angle));
+            polygon << QPointF(locationX + size * cos(angle), locationY + size * sin(angle));
         }
         item = scene->addPolygon(polygon);
     }
 
     if (item) {
-        item->setTransformOriginPoint(size / 2, size / 2);
+        item->setTransformOriginPoint((locationX + size) / 2, (locationY + size) / 2);
         item->setRotation(rotation);
     }
 }
 
 void MainWindow::on_saveFiguresButton_clicked()
 {
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save Figures"), "", tr("CSV Files (*.csv)"));
+    QString fileName = QFileDialog::getSaveFileName(this,
+                                                    tr("Save Figures"),
+                                                    "",
+                                                    tr("CSV Files (*.csv)"));
     if (!fileName.isEmpty()) {
         saveFiguresToFile(fileName);
     }
@@ -115,7 +153,10 @@ void MainWindow::on_saveFiguresButton_clicked()
 
 void MainWindow::on_loadFiguresButton_clicked()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Load Figures"), "", tr("CSV Files (*.csv)"));
+    QString fileName = QFileDialog::getOpenFileName(this,
+                                                    tr("Load Figures"),
+                                                    "",
+                                                    tr("CSV Files (*.csv)"));
     if (!fileName.isEmpty()) {
         loadFiguresFromFile(fileName);
     }
@@ -132,9 +173,10 @@ void MainWindow::saveFiguresToFile(const QString &fileName)
     if (file.open(QIODevice::WriteOnly)) {
         QTextStream out(&file);
         for (const auto &figure : figures) {
-            out << figure["shape"].toString() << ","
-                << figure["size"].toInt() << ","
-                << figure["rotation"].toInt() << "\n";
+            out << figure["shape"].toString() << "," << figure["size"].toInt() << ","
+                << figure["rotation"].toInt() << ","
+                << figure["locationX"].toInt() << ","
+                << figure["locationY"].toInt() << "\n";
         }
         file.close();
     } else {
@@ -152,11 +194,15 @@ void MainWindow::loadFiguresFromFile(const QString &fileName)
         while (!in.atEnd()) {
             QString line = in.readLine();
             QStringList parts = line.split(",");
-            if (parts.size() == 3) {
+            if (parts.size() == 5) {
                 QMap<QString, QVariant> figure;
+
                 figure["shape"] = parts[0];
                 figure["size"] = parts[1].toInt();
                 figure["rotation"] = parts[2].toInt();
+                figure["locationX"] = parts[3].toInt();
+                figure["locationY"] = parts[4].toInt();
+
                 figures.append(figure);
                 drawFigure(figure);
             }
